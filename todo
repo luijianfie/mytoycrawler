@@ -1,0 +1,19 @@
+
+
+
+1) lazyload src显示的不是完全的资源地址。
+http://ly88.yntxlx.com/tuxiang003/ynpc/?source=baidu&plan=%E4%BA%91%E5%8D%97PC&unit=%E4%BA%91%E5%8D%972&keyword=%E5%8E%BB%E4%BA%91%E5%8D%97%E7%91%9E%E4%B8%BD%E6%97%85%E6%B8%B8%E6%94%BB%E7%95%A5&e_creative=53855897706&e_keywordid=332031491385&e_keywordid2=282607238015&bd_vid=10108076718679117049&hdfshare=18988154971
+
+2）滚动式的，只能截取到部分的图片[done]
+https://www.veer.com/search-image/fengjing/
+
+这个问题和问题4也有关，开启imagesenable，再通过一个全屏截图CaptureScreenshot来解决；
+
+
+3）图片命名的时候的时候存在问题，图片的网络地址结尾不一定是图片格式，带有相关参数
+http://www.mafengwo.cn/jd/15812/gonglve.html
+
+
+4) 截图时候不显示图片[done]
+和chromedp的配置相关的，默认是打开的
+		chromedp.Flag("imagesEnabled=true"),

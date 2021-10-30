@@ -1,14 +1,11 @@
 package crawler
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -19,22 +16,35 @@ import (
 	"github.com/chromedp/chromedp/device"
 )
 
-func CrawlPicFromUrl(url, selector, path string, sel interface{}, sleep int) {
+func CrawlPicFromUrl(url, selector, path string, sel interface{}, sleep int, saveHTML bool) {
 
-	html, err := GetHttpHtmlContent(url, selector, sel, sleep)
+	html, background, err := GetHttpHtmlContent(url, selector, sel, sleep)
+
 	if err != nil {
-		fmt.Println(err)
+		log.Fatalf("failed to get html content. err:%v.\n", err)
 	}
-	GetSpecialData(html, "img[src]", "src", "./remote")
+
+	if background != nil {
+		savepath := filepath.Join(path, "backgroud.png")
+		savefile(savepath, &background)
+	}
+
+	if saveHTML {
+		htmlbyte := []byte(html)
+		savepath := filepath.Join(path, "htmlcontent.txt")
+		savefile(savepath, &htmlbyte)
+	}
+
+	GetSpecialData(html, "img[src]", "src", path)
 
 }
 
 //get html content from target url
-func GetHttpHtmlContent(url string, selector string, sel interface{}, sleep int) (string, error) {
+func GetHttpHtmlContent(url string, selector string, sel interface{}, sleep int) (string, []byte, error) {
 
 	options := []chromedp.ExecAllocatorOption{
 		chromedp.Flag("headless", true), // debug使用
-		chromedp.Flag("blink-settings", "imagesEnabled=false"),
+		chromedp.Flag("blink-settings", "imagesEnabled=true"),
 		chromedp.UserAgent(`Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/73.0.3683.103 Safari/537.36`),
 	}
 
@@ -47,17 +57,21 @@ func GetHttpHtmlContent(url string, selector string, sel interface{}, sleep int)
 	defer cancel()
 
 	var htmlContent string
+	var background []byte
+
 	err := chromedp.Run(timeoutCtx,
+		chromedp.EmulateViewport(1920, 2000),
 		chromedp.Navigate(url),
 		chromedp.Sleep(time.Duration(sleep)*time.Second),
+		chromedp.FullScreenshot(&background, 100),
 		chromedp.OuterHTML(sel, &htmlContent, chromedp.ByJSPath),
 	)
 	if err != nil {
 		log.Printf("Run err : %v\n", err)
-		return "", err
+		return "", nil, err
 	}
 
-	return htmlContent, nil
+	return htmlContent, background, nil
 }
 
 func GetSpecialData(htmlContent, selector, attr, path string) (string, error) {
@@ -68,20 +82,20 @@ func GetSpecialData(htmlContent, selector, attr, path string) (string, error) {
 	}
 
 	var str string
-	dom.Find(selector).Each(func(i int, selection *goquery.Selection) {
 
+	//
+	dom.Find(selector).Each(func(i int, selection *goquery.Selection) {
 		url, exist := selection.Attr(attr)
 
 		if exist {
-			savecontent(path, url)
+			saveImage(path, url)
 		}
 	})
 	return str, nil
 }
 
-//dir 暂时不设置
-func savecontent(dir string, url string) {
-
+//save content from url to dir.
+func saveImage(dir string, url string) {
 	slices := strings.Split(url, "//")
 	if len(slices) == 0 {
 		fmt.Printf("can't get pic name from url:%s.\n", url)
@@ -103,15 +117,26 @@ func savecontent(dir string, url string) {
 
 	path := filepath.Join(dir, name)
 
-	out, _ := os.Create(path)
-	defer out.Close()
-	_, ioerr := io.Copy(out, bytes.NewReader(body))
+	savefile(path, &body)
+
+	return
+}
+
+func savefile(path string, content *[]byte) bool {
+
+	// out, _ := os.Create(path)
+
+	// defer out.Close()
+	// _, ioerr := io.Copy(out, bytes.NewReader(*content))
+	ioerr := ioutil.WriteFile(path, *content, 0666)
 	if ioerr != nil {
-		fmt.Printf("failed to write file %s,url:%s.\n", name, url)
+		fmt.Printf("failed to write file %s.\n", path)
+		fmt.Println(ioerr)
+		return false
 	}
 
-	fmt.Printf("save file %s to disk.\n", name)
-	return
+	fmt.Printf("save file %s to disk.\n", path)
+	return true
 }
 
 // 截图，以图片的格式，或者以pdf的方式
